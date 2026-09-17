@@ -42,3 +42,6 @@ Thumbs.db
 
 # ---------- Local-only notes (kept on disk, not committed) ----------
 docs/
+
+# ---------- Local NuGet feed (BreakBox.Core / Generator packed from breakbox-api for dev) ----------
+.local-nuget/

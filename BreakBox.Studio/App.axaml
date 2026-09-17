@@ -1,0 +1,59 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="BreakBox.Studio.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <SolidColorBrush x:Key="Bg">#0c0e11</SolidColorBrush>
+        <SolidColorBrush x:Key="Panel">#13161b</SolidColorBrush>
+        <SolidColorBrush x:Key="Panel2">#10141a</SolidColorBrush>
+        <SolidColorBrush x:Key="Line">#262c34</SolidColorBrush>
+        <SolidColorBrush x:Key="LineBright">#3a434f</SolidColorBrush>
+        <SolidColorBrush x:Key="Text">#cdd3da</SolidColorBrush>
+        <SolidColorBrush x:Key="Dim">#7c8590</SolidColorBrush>
+        <SolidColorBrush x:Key="Amber">#e0a458</SolidColorBrush>
+        <SolidColorBrush x:Key="Green">#6cc07a</SolidColorBrush>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <Style Selector="Window">
+            <Setter Property="Background" Value="{DynamicResource Bg}" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Courier New, monospace" />
+        </Style>
+
+        <!-- left-rail nav buttons -->
+        <Style Selector="Button.nav">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
+        <Style Selector="Button.nav /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.nav:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1a1f27" />
+        </Style>
+        <Style Selector="Button.nav.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#241d10" />
+        </Style>
+        <Style Selector="Button.nav.active">
+            <Setter Property="Foreground" Value="{DynamicResource Amber}" />
+        </Style>
+        <Style Selector="Button.nav:disabled">
+            <Setter Property="Foreground" Value="#4a515b" />
+        </Style>
+
+        <!-- primary action button -->
+        <Style Selector="Button.primary">
+            <Setter Property="Foreground" Value="#1a1205" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="Button.primary /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Amber}" />
+        </Style>
+    </Application.Styles>
+</Application>

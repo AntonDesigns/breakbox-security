@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="980" d:DesignHeight="640"
+        x:Class="BreakBox.Studio.MainWindow"
+        Title="BreakBox Studio"
+        Width="980" Height="640" MinWidth="760" MinHeight="480"
+        Background="{DynamicResource Bg}">
+
+    <DockPanel>
+        <!-- top bar -->
+        <Border DockPanel.Dock="Top" Background="{DynamicResource Panel}"
+                BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="16,10">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="BreakBox" Foreground="{DynamicResource Text}" FontWeight="Bold" FontSize="15" />
+                    <TextBlock Text="// toolkit" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="0x4D414836" Foreground="{DynamicResource Amber}" FontSize="12"
+                           VerticalAlignment="Center" ToolTip.Tip="author signature (MAH6)" />
+            </Grid>
+        </Border>
+
+        <!-- left nav -->
+        <Border DockPanel.Dock="Left" Width="210" Background="{DynamicResource Panel2}"
+                BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0" Padding="10,14">
+            <StackPanel Spacing="3">
+                <TextBlock Text="TOOLS" Foreground="{DynamicResource Dim}" FontSize="11" Margin="6,0,0,8" />
+                <Button x:Name="NavPeek" Classes="nav" Click="OnNav" Tag="peek" Content="Peek" />
+                <Button x:Name="NavKeygen" Classes="nav" Click="OnNav" Tag="keygen" Content="Keygen" />
+                <Button x:Name="NavFlip" Classes="nav" IsEnabled="False" Content="Flip  (Sprint 2)" />
+                <TextBlock Text="own generated targets only / authorized use"
+                           Foreground="{DynamicResource Dim}" FontSize="10" Margin="6,20,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- content -->
+        <Panel>
+            <!-- PEEK -->
+            <Grid x:Name="PeekPanel" Margin="26" RowDefinitions="Auto,Auto,Auto,*">
+                <TextBlock Text="Peek" Foreground="{DynamicResource Text}" FontSize="22" FontWeight="Bold" />
+                <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,6,0,14" Foreground="{DynamicResource Dim}"
+                           Text="Look inside a .NET assembly: its methods, the strings baked into the code, and the methods that look like a licence check. Start with the likely checks." />
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
+                    <Button Classes="primary" Click="OnOpenDll" Content="Open .dll…" />
+                    <TextBlock x:Name="PeekTarget" Text="no target loaded" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
+                </StackPanel>
+                <Border Grid.Row="3" Margin="0,14,0,0" Background="{DynamicResource Panel2}"
+                        BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="6">
+                    <TextBox x:Name="PeekResults" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                             Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Text}"
+                             Padding="12" FontSize="12"
+                             Watermark="Open a .dll to inspect it."
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                </Border>
+            </Grid>
+
+            <!-- KEYGEN: reverse the Level 2 serial, step by step -->
+            <Grid x:Name="KeygenPanel" Margin="26" RowDefinitions="Auto,Auto,Auto,*" IsVisible="False">
+                <TextBlock Text="Keygen" Foreground="{DynamicResource Text}" FontSize="22" FontWeight="Bold" />
+                <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,6,0,14" Foreground="{DynamicResource Dim}"
+                           Text="Reverse the Level 2 serial. The serial is not stored in the program, it is computed from a Seed, so Peek cannot find it. This walks the reverse step by step, lets you work out the serial yourself, and only reveals it when you choose." />
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
+                    <Button Classes="primary" Click="OnOpenLevel2" Content="Open Level 2 .dll…" />
+                    <TextBlock x:Name="KgTarget" Text="no target loaded" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
+                </StackPanel>
+                <ScrollViewer Grid.Row="3" Margin="0,16,0,0">
+                    <StackPanel x:Name="KgSteps" Spacing="12" />
+                </ScrollViewer>
+            </Grid>
+        </Panel>
+    </DockPanel>
+</Window>
