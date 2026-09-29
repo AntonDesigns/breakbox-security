@@ -18,6 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="..\BreakBox.Studio\BreakBox.Studio.csproj" />
     <PackageReference Include="BreakBox.Core" Version="0.1.0" />
-    <PackageReference Include="BreakBox.Generator" Version="0.1.0" />
+    <!-- 0.2.0: the WinForms level targets + runnable-.exe packaging. Bumped in lockstep with the
+         generator package (breakbox-api publishes it); 0.1.0 stays immutable in the feed. -->
+    <PackageReference Include="BreakBox.Generator" Version="0.2.0" />
   </ItemGroup>
 </Project>

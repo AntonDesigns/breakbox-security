@@ -14,7 +14,7 @@ public sealed class PeekTests
 {
     // Peek should find, inside a freshly generated Level 1 target, the prompt strings and the
     // method that does the check. This proves my inspector works on a real compiled assembly.
-    [Fact]
+    [WindowsOnlyFact]
     public void Peek_finds_the_strings_and_the_check_in_a_generated_target()
     {
         var provider = new RoslynChallengeProvider(new LevelCatalog(), new EmbeddedTemplateSource(),
@@ -32,8 +32,11 @@ public sealed class PeekTests
 
         var result = new CecilAssemblyInspector().Inspect(dll);
 
-        Assert.Contains(result.Strings, h => h.Value.Contains("Enter key"));
-        Assert.Contains(result.Strings, h => h.Value.Contains("Invalid key"));
+        // The NoteBox target ships its prompt ("Enter your licence key") and its error ("Invalid
+        // licence key...") as plain string literals, so Peek reads them straight out of the IL. And
+        // IsValid is named like a check, so it lands in LikelyChecks: exactly the method to read.
+        Assert.Contains(result.Strings, h => h.Value.Contains("licence key"));
+        Assert.Contains(result.Strings, h => h.Value.Contains("Invalid"));
         Assert.Contains(result.LikelyChecks, c => c.Contains("IsValid"));
     }
 }

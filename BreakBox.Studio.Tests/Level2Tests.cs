@@ -1,8 +1,8 @@
 // BreakBox. Written by Max-Anton Horvat. Complex Software Systems (S6).
 // Signature 0x4D414836 = "MAH6" in ASCII (my initials + semester 6). I wrote this.
 
-using System.Diagnostics;
 using System.IO.Compression;
+using System.Reflection;
 using BreakBox.Core;
 using BreakBox.Generator;
 using BreakBox.Studio.Engines;
@@ -24,7 +24,7 @@ public sealed class Level2Tests
         return m.ToArray();
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Build_level2_returns_a_numeric_serial()
     {
         var c = Provider().Build(2);
@@ -34,7 +34,7 @@ public sealed class Level2Tests
 
     // The keygen reads the Seed out of the compiled target and reproduces the serial. If it matches
     // the answer the generator baked in, my keygen has correctly reversed the algorithm.
-    [Fact]
+    [WindowsOnlyFact]
     public void Keygen_reproduces_the_serial_from_the_dll()
     {
         var c = Provider().Build(2);
@@ -44,7 +44,7 @@ public sealed class Level2Tests
         Assert.Equal(c.ValidKey, serial!.Value.ToString());
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void Generated_level2_unlocks_with_the_keygen_serial()
     {
         var c = Provider().Build(2);
@@ -52,18 +52,14 @@ public sealed class Level2Tests
         using (var zip = new ZipArchive(new MemoryStream(c.Bytes)))
             zip.ExtractToDirectory(dir);
 
-        var psi = new ProcessStartInfo("dotnet", $"\"{Path.Combine(dir, "Level2.dll")}\"")
-        {
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-        };
-        using var p = Process.Start(psi)!;
-        p.StandardInput.WriteLine(c.ValidKey);
-        p.StandardInput.WriteLine();
-        var output = p.StandardOutput.ReadToEnd();
-        p.WaitForExit(20000);
+        // The target is a GUI app now, so I check the serial logic headlessly instead of driving a
+        // window: load the compiled dll and invoke its private IsValid. The keygen's serial passes;
+        // a wrong one fails. IsValid touches no WinForms type, so no UI spins up here.
+        var asm = Assembly.LoadFile(Path.Combine(dir, "Level2.dll"));
+        var program = asm.GetType("Level2.Program")!;
+        var isValid = program.GetMethod("IsValid", BindingFlags.NonPublic | BindingFlags.Static)!;
 
-        Assert.Contains("Premium unlocked", output);
+        Assert.True((bool)isValid.Invoke(null, new object[] { c.ValidKey })!);
+        Assert.False((bool)isValid.Invoke(null, new object[] { "0" })!);
     }
 }
