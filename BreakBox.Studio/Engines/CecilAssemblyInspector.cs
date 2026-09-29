@@ -35,42 +35,51 @@ public sealed class CecilAssemblyInspector : IAssemblyInspector
         var strings = new List<StringHit>();
         var likely = new List<string>();
 
+        // Walk top-level types and everything nested inside them. Real .NET apps (like the WinForms
+        // targets, whose forms are nested classes) keep most of their code in nested types, so Peek has
+        // to recurse or it misses the strings and the check that live there.
         foreach (var type in module.Types)
-        {
-            foreach (var method in type.Methods)
-            {
-                // 1) The method list is the map of the program. A name like IsValid or Expected tells
-                //    me where the logic lives before I read a single instruction.
-                var full = $"{type.Name}.{method.Name}";
-                methods.Add(full);
-
-                var nameLooksLikeCheck = CheckWords.Any(w => method.Name.ToLowerInvariant().Contains(w));
-                var bodyHasCheckString = false;
-
-                // 2) Ldstr is the IL instruction that loads a string literal. Pulling these out is how
-                //    I read the hardcoded key in Level 1 WITHOUT running the program: the string is
-                //    right there in the code. This is the whole "never hardcode a secret" lesson, live.
-                if (method.HasBody)
-                {
-                    foreach (var ins in method.Body.Instructions)
-                    {
-                        if (ins.OpCode == OpCodes.Ldstr && ins.Operand is string s)
-                        {
-                            strings.Add(new StringHit(type.Name, method.Name, s));
-                            var low = s.ToLowerInvariant();
-                            if (low.Contains("invalid") || low.Contains("wrong") || low.Contains("unlock"))
-                                bodyHasCheckString = true;
-                        }
-                    }
-                }
-
-                // 3) A method named like a check, or one that prints "invalid"/"unlock", is where the
-                //    decision lives. That is the line I read for a key, or patch to always pass.
-                if (nameLooksLikeCheck || bodyHasCheckString)
-                    likely.Add(full);
-            }
-        }
+            Walk(type, methods, strings, likely);
 
         return new InspectionResult(methods, strings, likely);
+    }
+
+    private static void Walk(TypeDefinition type, List<string> methods, List<StringHit> strings, List<string> likely)
+    {
+        foreach (var method in type.Methods)
+        {
+            // 1) The method list is the map of the program. A name like IsValid or Expected tells me
+            //    where the logic lives before I read a single instruction.
+            var full = $"{type.Name}.{method.Name}";
+            methods.Add(full);
+
+            var nameLooksLikeCheck = CheckWords.Any(w => method.Name.ToLowerInvariant().Contains(w));
+            var bodyHasCheckString = false;
+
+            // 2) Ldstr is the IL instruction that loads a string literal. Pulling these out is how I
+            //    read the hardcoded key in Level 1 WITHOUT running the program: the string is right
+            //    there in the code. This is the whole "never hardcode a secret" lesson, live.
+            if (method.HasBody)
+            {
+                foreach (var ins in method.Body.Instructions)
+                {
+                    if (ins.OpCode == OpCodes.Ldstr && ins.Operand is string s)
+                    {
+                        strings.Add(new StringHit(type.Name, method.Name, s));
+                        var low = s.ToLowerInvariant();
+                        if (low.Contains("invalid") || low.Contains("wrong") || low.Contains("unlock"))
+                            bodyHasCheckString = true;
+                    }
+                }
+            }
+
+            // 3) A method named like a check, or one that prints "invalid"/"unlock", is where the
+            //    decision lives. That is the line I read for a key, or patch to always pass.
+            if (nameLooksLikeCheck || bodyHasCheckString)
+                likely.Add(full);
+        }
+
+        foreach (var nested in type.NestedTypes)
+            Walk(nested, methods, strings, likely);
     }
 }
