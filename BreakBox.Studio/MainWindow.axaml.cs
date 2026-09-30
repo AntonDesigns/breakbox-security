@@ -3,7 +3,6 @@
 
 using System;
 using System.IO;
-using System.Text;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,16 +10,12 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
-using BreakBox.Core;
 using BreakBox.Studio.Engines;
 
 namespace BreakBox.Studio;
 
 public partial class MainWindow : Window
 {
-    // The engine is the same class the tests exercise. The window is only a face over it.
-    private readonly IAssemblyInspector _inspector = new CecilAssemblyInspector();
-
     // Palette, matching App.axaml, for the controls I build in code.
     private static readonly IBrush PanelBr = new SolidColorBrush(Color.Parse("#13161b"));
     private static readonly IBrush LineBr = new SolidColorBrush(Color.Parse("#262c34"));
@@ -61,30 +56,117 @@ public partial class MainWindow : Window
         else b.Classes.Remove("active");
     }
 
-    // ---- Peek: read only inspection, never runs the file ----
+    // ---- Peek: read only X-ray, never runs the file ----
+    private static readonly FontFamily Mono = new("Cascadia Mono, Consolas, monospace");
+    private static readonly IBrush CheckBg = new SolidColorBrush(Color.Parse("#241d10"));
+
     private async void OnOpenDll(object? sender, RoutedEventArgs e)
     {
         var file = await PickAssembly("Choose a .NET assembly");
         if (file is null) return;
 
         PeekTarget.Text = file.Name;
-        try { PeekResults.Text = Format(_inspector.Inspect(await ReadBytes(file))); }
-        catch (Exception ex) { PeekResults.Text = $"Could not read this file as a .NET assembly.\n\n{ex.Message}"; }
+        PeekTree.Items.Clear();
+        PeekDetail.Children.Clear();
+
+        try
+        {
+            var map = AssemblyMap.Read(await ReadBytes(file));
+            PeekSummary.Text = $"· {map.MethodCount} methods, {map.StringCount} strings";
+            foreach (var t in map.Types) PeekTree.Items.Add(MakeTypeItem(t));
+            PeekDetail.Children.Add(new TextBlock
+            {
+                Text = "Pick a method from the tree. The one marked \"check\" is where the licence decision lives.",
+                Foreground = DimBr,
+                TextWrapping = TextWrapping.Wrap,
+            });
+        }
+        catch (Exception ex)
+        {
+            PeekSummary.Text = "";
+            PeekDetail.Children.Add(new TextBlock
+            {
+                Text = $"Could not read this file as a .NET assembly.\n\n{ex.Message}",
+                Foreground = RedBr,
+                TextWrapping = TextWrapping.Wrap,
+            });
+        }
     }
 
-    private static string Format(InspectionResult r)
+    private TreeViewItem MakeTypeItem(MapType type)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"Methods ({r.Methods.Count}):");
-        foreach (var m in r.Methods) sb.AppendLine($"  {m}");
-        sb.AppendLine();
-        sb.AppendLine($"Strings in the code ({r.Strings.Count}):");
-        foreach (var s in r.Strings) sb.AppendLine($"  {s.Type}.{s.Method}: \"{s.Value}\"");
-        sb.AppendLine();
-        sb.AppendLine("Likely check methods (start here):");
-        foreach (var c in r.LikelyChecks) sb.AppendLine($"  {c}");
-        return sb.ToString();
+        var item = new TreeViewItem
+        {
+            Header = new TextBlock { Text = type.Name, Foreground = TextBr, FontWeight = FontWeight.Bold },
+            IsExpanded = true,
+        };
+        foreach (var m in type.Methods) item.Items.Add(MakeMethodItem(m));
+        foreach (var n in type.Nested) item.Items.Add(MakeTypeItem(n));
+        return item;
     }
+
+    private TreeViewItem MakeMethodItem(MapMethod m)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        row.Children.Add(new TextBlock { Text = m.Name, Foreground = m.LikelyCheck ? AmberBr : TextBr });
+        if (m.LikelyCheck)
+            row.Children.Add(new Border
+            {
+                Background = CheckBg,
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(5, 0, 5, 1),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock { Text = "check", Foreground = AmberBr, FontSize = 10 },
+            });
+        return new TreeViewItem { Header = row, Tag = m };
+    }
+
+    private void OnMethodSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (PeekTree.SelectedItem is TreeViewItem { Tag: MapMethod m }) ShowMethod(m);
+    }
+
+    private void ShowMethod(MapMethod m)
+    {
+        PeekDetail.Children.Clear();
+        PeekDetail.Children.Add(new TextBlock
+        {
+            Text = m.Name, Foreground = m.LikelyCheck ? AmberBr : TextBr, FontSize = 15, FontWeight = FontWeight.Bold,
+        });
+        if (m.LikelyCheck)
+            PeekDetail.Children.Add(new TextBlock
+            {
+                Text = "This looks like the check. Read what it compares against.",
+                Foreground = AmberBr, FontSize = 11, TextWrapping = TextWrapping.Wrap,
+            });
+
+        if (m.Strings.Count > 0)
+        {
+            PeekDetail.Children.Add(SectionLabel($"strings ({m.Strings.Count})"));
+            foreach (var s in m.Strings)
+                PeekDetail.Children.Add(new TextBlock
+                {
+                    Text = "\"" + s + "\"", Foreground = GreenBr, FontFamily = Mono, FontSize = 12, TextWrapping = TextWrapping.Wrap,
+                });
+        }
+
+        PeekDetail.Children.Add(SectionLabel($"IL ({m.Il.Count} instructions)"));
+        if (m.Il.Count == 0)
+            PeekDetail.Children.Add(new TextBlock { Text = "no body (abstract, or declared elsewhere)", Foreground = DimBr, FontSize = 12 });
+        else
+            PeekDetail.Children.Add(new TextBox
+            {
+                Text = string.Join("\n", m.Il),
+                IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap,
+                Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+                Foreground = TextBr, FontFamily = Mono, FontSize = 12, Padding = new Thickness(0),
+            });
+    }
+
+    private static TextBlock SectionLabel(string s) => new()
+    {
+        Text = s, Foreground = DimBr, FontSize = 11, FontWeight = FontWeight.Bold, Margin = new Thickness(0, 8, 0, 2),
+    };
 
     // ---- Keygen: walk the reverse, let the user compute it, reveal on demand ----
     private async void OnOpenLevel2(object? sender, RoutedEventArgs e)

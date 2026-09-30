@@ -37,24 +37,32 @@
 
         <!-- content -->
         <Panel>
-            <!-- PEEK -->
+            <!-- PEEK: X-ray view, a type tree on the left and the selected method's IL on the right -->
             <Grid x:Name="PeekPanel" Margin="26" RowDefinitions="Auto,Auto,Auto,*">
                 <TextBlock Text="Peek" Foreground="{DynamicResource Text}" FontSize="22" FontWeight="Bold" />
                 <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,6,0,14" Foreground="{DynamicResource Dim}"
-                           Text="Look inside a .NET assembly: its methods, the strings baked into the code, and the methods that look like a licence check. Start with the likely checks." />
+                           Text="X-ray a .NET assembly. The tree is its types and methods, with the likely check marked. Click a method to read its strings and its IL, without ever running the file." />
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
                     <Button Classes="primary" Click="OnOpenDll" Content="Open .dll…" />
                     <TextBlock x:Name="PeekTarget" Text="no target loaded" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="PeekSummary" Text="" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
                 </StackPanel>
-                <Border Grid.Row="3" Margin="0,14,0,0" Background="{DynamicResource Panel2}"
-                        BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="6">
-                    <TextBox x:Name="PeekResults" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
-                             Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Text}"
-                             Padding="12" FontSize="12"
-                             Watermark="Open a .dll to inspect it."
-                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
-                </Border>
+                <Grid Grid.Row="3" Margin="0,14,0,0" ColumnDefinitions="330,*">
+                    <Border Background="{DynamicResource Panel2}" BorderBrush="{DynamicResource Line}"
+                            BorderThickness="1" CornerRadius="6">
+                        <TreeView x:Name="PeekTree" Background="Transparent" Padding="4"
+                                  SelectionChanged="OnMethodSelected" />
+                    </Border>
+                    <Border Grid.Column="1" Margin="12,0,0,0" Background="{DynamicResource Panel2}"
+                            BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="6">
+                        <ScrollViewer>
+                            <StackPanel x:Name="PeekDetail" Margin="16" Spacing="10">
+                                <TextBlock Text="Open a .dll, then pick a method from the tree."
+                                           Foreground="{DynamicResource Dim}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
             </Grid>
 
             <!-- KEYGEN: reverse the Level 2 serial, step by step -->
