@@ -54,8 +54,11 @@ public static class AssemblyMap
         foreach (var method in type.Methods)
         {
             // Property and event accessors are noise in the map; the real logic is the named methods.
+            // So are the compiler's generated lambda bodies (names like "<.ctor>b__5_0"), which the
+            // new hand-built UI produces a lot of; hiding them keeps the tree readable.
             if (method.Name.StartsWith("get_") || method.Name.StartsWith("set_") ||
-                method.Name.StartsWith("add_") || method.Name.StartsWith("remove_"))
+                method.Name.StartsWith("add_") || method.Name.StartsWith("remove_") ||
+                method.Name.Contains('<'))
                 continue;
 
             var il = new List<string>();

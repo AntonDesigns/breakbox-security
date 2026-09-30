@@ -38,29 +38,59 @@
         <!-- content -->
         <Panel>
             <!-- PEEK: X-ray view, a type tree on the left and the selected method's IL on the right -->
-            <Grid x:Name="PeekPanel" Margin="26" RowDefinitions="Auto,Auto,Auto,*">
-                <TextBlock Text="Peek" Foreground="{DynamicResource Text}" FontSize="22" FontWeight="Bold" />
-                <TextBlock Grid.Row="1" TextWrapping="Wrap" Margin="0,6,0,14" Foreground="{DynamicResource Dim}"
-                           Text="X-ray a .NET assembly. The tree is its types and methods, with the likely check marked. Click a method to read its strings and its IL, without ever running the file." />
-                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
-                    <Button Classes="primary" Click="OnOpenDll" Content="Open .dll…" />
-                    <TextBlock x:Name="PeekTarget" Text="no target loaded" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
-                    <TextBlock x:Name="PeekSummary" Text="" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" />
+            <Grid x:Name="PeekPanel" Margin="28,24,28,24" RowDefinitions="Auto,Auto,*">
+                <!-- header -->
+                <StackPanel Grid.Row="0" Spacing="6">
+                    <TextBlock Text="Peek" Foreground="{DynamicResource Text}" FontSize="24" FontWeight="Bold" />
+                    <TextBlock TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left" Foreground="{DynamicResource Dim}"
+                               Text="X-ray a .NET assembly without running it. The tree on the left is its real structure; pick a method to read its strings and decoded IL. The method marked check is where the licence decision lives." />
                 </StackPanel>
-                <Grid Grid.Row="3" Margin="0,14,0,0" ColumnDefinitions="330,*">
-                    <Border Background="{DynamicResource Panel2}" BorderBrush="{DynamicResource Line}"
-                            BorderThickness="1" CornerRadius="6">
-                        <TreeView x:Name="PeekTree" Background="Transparent" Padding="4"
-                                  SelectionChanged="OnMethodSelected" />
+
+                <!-- toolbar + live stats -->
+                <Border Grid.Row="1" Margin="0,18,0,0" Background="{DynamicResource Panel}"
+                        BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                    <Grid ColumnDefinitions="Auto,Auto,*">
+                        <Button Grid.Column="0" Classes="primary" Click="OnOpenDll" Content="Open .dll…" />
+                        <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="PeekTarget" Text="no target loaded" Foreground="{DynamicResource Text}" FontWeight="SemiBold" />
+                            <TextBlock Text="read only  ·  never executed" Foreground="{DynamicResource Dim}" FontSize="11" />
+                        </StackPanel>
+                        <StackPanel x:Name="PeekStats" Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <!-- structure | detail -->
+                <Grid Grid.Row="2" Margin="0,16,0,0" ColumnDefinitions="340,8,*">
+                    <Border Grid.Column="0" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}"
+                            BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Top" Padding="16,11" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="STRUCTURE" Classes="cardhead" />
+                            </Border>
+                            <ScrollViewer>
+                                <TreeView x:Name="PeekTree" Background="Transparent" Padding="8,8"
+                                          SelectionChanged="OnMethodSelected" />
+                            </ScrollViewer>
+                        </DockPanel>
                     </Border>
-                    <Border Grid.Column="1" Margin="12,0,0,0" Background="{DynamicResource Panel2}"
-                            BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="6">
-                        <ScrollViewer>
-                            <StackPanel x:Name="PeekDetail" Margin="16" Spacing="10">
-                                <TextBlock Text="Open a .dll, then pick a method from the tree."
-                                           Foreground="{DynamicResource Dim}" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </ScrollViewer>
+
+                    <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns"
+                                  HorizontalAlignment="Stretch" />
+
+                    <Border Grid.Column="2" Background="{DynamicResource Panel}" BorderBrush="{DynamicResource Line}"
+                            BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Top" Padding="18,11" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="DETAIL" Classes="cardhead" />
+                            </Border>
+                            <ScrollViewer>
+                                <StackPanel x:Name="PeekDetail" Margin="20,18" Spacing="14">
+                                    <TextBlock Text="Open a .dll, then pick a method from the tree."
+                                               Foreground="{DynamicResource Dim}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
                     </Border>
                 </Grid>
             </Grid>
