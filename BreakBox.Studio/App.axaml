@@ -55,5 +55,41 @@
         <Style Selector="Button.primary /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource Amber}" />
         </Style>
+
+        <!-- section header on a card -->
+        <Style Selector="TextBlock.cardhead">
+            <Setter Property="Foreground" Value="{DynamicResource Dim}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="LetterSpacing" Value="1.5" />
+        </Style>
+
+        <!-- roomier tree rows so the structure does not feel crowded -->
+        <Style Selector="TreeViewItem">
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Margin" Value="0,1" />
+        </Style>
+
+        <!-- selection in the amber family, not the Windows system accent (which can be red/blue) -->
+        <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#2a220f" />
+        </Style>
+        <Style Selector="TreeViewItem:selected:focus /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#3a2e14" />
+        </Style>
+        <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#3a2e14" />
+        </Style>
+        <Style Selector="TreeViewItem:selected:focus:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#43350f" />
+        </Style>
+
+        <!-- draggable divider between the two panes -->
+        <Style Selector="GridSplitter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="GridSplitter:pointerover">
+            <Setter Property="Background" Value="{DynamicResource LineBright}" />
+        </Style>
     </Application.Styles>
 </Application>

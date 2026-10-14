@@ -2,8 +2,9 @@
 // Signature 0x4D414836 = "MAH6" in ASCII (my initials + semester 6). I wrote this.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,16 +12,12 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
-using BreakBox.Core;
 using BreakBox.Studio.Engines;
 
 namespace BreakBox.Studio;
 
 public partial class MainWindow : Window
 {
-    // The engine is the same class the tests exercise. The window is only a face over it.
-    private readonly IAssemblyInspector _inspector = new CecilAssemblyInspector();
-
     // Palette, matching App.axaml, for the controls I build in code.
     private static readonly IBrush PanelBr = new SolidColorBrush(Color.Parse("#13161b"));
     private static readonly IBrush LineBr = new SolidColorBrush(Color.Parse("#262c34"));
@@ -29,16 +26,39 @@ public partial class MainWindow : Window
     private static readonly IBrush AmberBr = new SolidColorBrush(Color.Parse("#e0a458"));
     private static readonly IBrush GreenBr = new SolidColorBrush(Color.Parse("#6cc07a"));
     private static readonly IBrush RedBr = new SolidColorBrush(Color.Parse("#c76b6b"));
+    private static readonly IBrush Panel2Br = new SolidColorBrush(Color.Parse("#10141a"));
+    private static readonly IBrush CodeBg = new SolidColorBrush(Color.Parse("#0c0f14"));
+    private static readonly IBrush ChipBg = new SolidColorBrush(Color.Parse("#11201a"));
+    private static readonly IBrush ChipEdge = new SolidColorBrush(Color.Parse("#1e3a2e"));
+    private static readonly IBrush CalloutEdge = new SolidColorBrush(Color.Parse("#4a3a1c"));
 
     // Keygen state: the Seed I recovered, the serial it produces, and how far the walkthrough is.
     private int? _seed;
     private long _serial;
     private int _step;
 
-    public MainWindow()
+    // The tree row for the first likely check method, so opening a target lands you on it.
+    private TreeViewItem? _checkItem;
+
+    public MainWindow() : this(null) { }
+
+    public MainWindow(string[]? args)
     {
         InitializeComponent();
         Select("peek");
+
+        // Open a target straight away when one is passed on the command line ("BreakBox path\to.dll"),
+        // so the tool can be launched onto a file. Done after the window loads so the controls exist.
+        var path = args?.FirstOrDefault(a =>
+            File.Exists(a) && (a.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                            || a.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)));
+        if (path is not null) Loaded += (_, _) => LoadPath(path);
+    }
+
+    private async void LoadPath(string path)
+    {
+        try { LoadAssembly(Path.GetFileName(path), await File.ReadAllBytesAsync(path)); }
+        catch (Exception ex) { ShowLoadError(ex.Message); }
     }
 
     // ---- navigation ----
@@ -61,30 +81,209 @@ public partial class MainWindow : Window
         else b.Classes.Remove("active");
     }
 
-    // ---- Peek: read only inspection, never runs the file ----
+    // ---- Peek: read only X-ray, never runs the file ----
+    private static readonly FontFamily Mono = new("Cascadia Mono, Consolas, monospace");
+    private static readonly IBrush CheckBg = new SolidColorBrush(Color.Parse("#241d10"));
+
     private async void OnOpenDll(object? sender, RoutedEventArgs e)
     {
         var file = await PickAssembly("Choose a .NET assembly");
         if (file is null) return;
-
-        PeekTarget.Text = file.Name;
-        try { PeekResults.Text = Format(_inspector.Inspect(await ReadBytes(file))); }
-        catch (Exception ex) { PeekResults.Text = $"Could not read this file as a .NET assembly.\n\n{ex.Message}"; }
+        LoadAssembly(file.Name, await ReadBytes(file));
     }
 
-    private static string Format(InspectionResult r)
+    // Read a target's structure and fill the tree, the stats bar and the detail pane. Shared by the
+    // file picker and the command-line path.
+    private void LoadAssembly(string name, byte[] bytes)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine($"Methods ({r.Methods.Count}):");
-        foreach (var m in r.Methods) sb.AppendLine($"  {m}");
-        sb.AppendLine();
-        sb.AppendLine($"Strings in the code ({r.Strings.Count}):");
-        foreach (var s in r.Strings) sb.AppendLine($"  {s.Type}.{s.Method}: \"{s.Value}\"");
-        sb.AppendLine();
-        sb.AppendLine("Likely check methods (start here):");
-        foreach (var c in r.LikelyChecks) sb.AppendLine($"  {c}");
-        return sb.ToString();
+        PeekTarget.Text = name;
+        PeekTree.Items.Clear();
+        PeekDetail.Children.Clear();
+        PeekStats.Children.Clear();
+        _checkItem = null;
+
+        try
+        {
+            var map = AssemblyMap.Read(bytes);
+
+            var typeCount = 0;
+            void Count(MapType t) { typeCount++; foreach (var n in t.Nested) Count(n); }
+            foreach (var t in map.Types) Count(t);
+
+            PeekStats.Children.Add(StatPill(typeCount, typeCount == 1 ? "type" : "types", AmberBr));
+            PeekStats.Children.Add(StatPill(map.MethodCount, "methods", TextBr));
+            PeekStats.Children.Add(StatPill(map.StringCount, "strings", GreenBr));
+
+            foreach (var t in map.Types) PeekTree.Items.Add(MakeTypeItem(t));
+
+            // Land on the likely check method, since that is what a cracker reads first.
+            if (_checkItem is not null)
+                _checkItem.IsSelected = true;
+            else
+                PeekDetail.Children.Add(new TextBlock
+                {
+                    Text = "Pick a method from the tree. The one marked check is where the licence decision lives.",
+                    Foreground = DimBr,
+                    TextWrapping = TextWrapping.Wrap,
+                });
+        }
+        catch (Exception ex)
+        {
+            ShowLoadError(ex.Message);
+        }
     }
+
+    private void ShowLoadError(string message)
+    {
+        PeekStats.Children.Clear();
+        PeekDetail.Children.Clear();
+        PeekDetail.Children.Add(new TextBlock
+        {
+            Text = $"Could not read this file as a .NET assembly.\n\n{message}",
+            Foreground = RedBr,
+            TextWrapping = TextWrapping.Wrap,
+        });
+    }
+
+    private TreeViewItem MakeTypeItem(MapType type)
+    {
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        head.Children.Add(new TextBlock { Text = type.Name, Foreground = TextBr, FontWeight = FontWeight.SemiBold });
+        if (type.Methods.Count > 0)
+            head.Children.Add(new TextBlock
+            {
+                Text = type.Methods.Count.ToString(), Foreground = DimBr, FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+
+        var item = new TreeViewItem { Header = head, IsExpanded = true };
+        foreach (var m in type.Methods) item.Items.Add(MakeMethodItem(m));
+        foreach (var n in type.Nested) item.Items.Add(MakeTypeItem(n));
+        return item;
+    }
+
+    private TreeViewItem MakeMethodItem(MapMethod m)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        row.Children.Add(new TextBlock { Text = "ƒ", Foreground = DimBr, FontFamily = Mono, VerticalAlignment = VerticalAlignment.Center });
+        row.Children.Add(new TextBlock { Text = m.Name, Foreground = m.LikelyCheck ? AmberBr : TextBr, VerticalAlignment = VerticalAlignment.Center });
+        if (m.LikelyCheck)
+            row.Children.Add(new Border
+            {
+                Background = CheckBg,
+                BorderBrush = CalloutEdge,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 0, 6, 1),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock { Text = "check", Foreground = AmberBr, FontSize = 10, FontWeight = FontWeight.Bold },
+            });
+        var item = new TreeViewItem { Header = row, Tag = m };
+        if (m.LikelyCheck) _checkItem ??= item;
+        return item;
+    }
+
+    private void OnMethodSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (PeekTree.SelectedItem is TreeViewItem { Tag: MapMethod m }) ShowMethod(m);
+    }
+
+    private void ShowMethod(MapMethod m)
+    {
+        PeekDetail.Children.Clear();
+
+        PeekDetail.Children.Add(new TextBlock
+        {
+            Text = m.Name, Foreground = m.LikelyCheck ? AmberBr : TextBr, FontSize = 18, FontWeight = FontWeight.Bold,
+        });
+        PeekDetail.Children.Add(new TextBlock
+        {
+            Text = $"{m.Il.Count} instructions  ·  {m.Strings.Count} strings",
+            Foreground = DimBr, FontSize = 12,
+        });
+
+        if (m.LikelyCheck)
+            PeekDetail.Children.Add(Callout(
+                "This looks like the licence check. Read what it compares against: that value is the answer, or the algorithm that computes it."));
+
+        if (m.Strings.Count > 0)
+        {
+            PeekDetail.Children.Add(SectionLabel($"STRINGS ({m.Strings.Count})"));
+            var chips = new StackPanel { Spacing = 6 };
+            foreach (var s in m.Strings) chips.Children.Add(Chip(s));
+            PeekDetail.Children.Add(chips);
+        }
+
+        PeekDetail.Children.Add(SectionLabel($"IL ({m.Il.Count} instructions)"));
+        if (m.Il.Count == 0)
+            PeekDetail.Children.Add(new TextBlock { Text = "no body (abstract, or declared elsewhere)", Foreground = DimBr, FontSize = 12 });
+        else
+            PeekDetail.Children.Add(IlBlock(m.Il));
+    }
+
+    // A rounded count pill for the stats bar: the number in an accent colour, the label dimmed.
+    private Control StatPill(int count, string label, IBrush accent)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
+        row.Children.Add(new TextBlock { Text = count.ToString(), Foreground = accent, FontWeight = FontWeight.Bold, FontFamily = Mono });
+        row.Children.Add(new TextBlock { Text = label, Foreground = DimBr });
+        return new Border
+        {
+            Background = Panel2Br, BorderBrush = LineBr, BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(999), Padding = new Thickness(12, 5), Child = row,
+        };
+    }
+
+    // The amber callout above a check method, so the important method stands out in the detail pane.
+    private Border Callout(string text) => new()
+    {
+        Background = CheckBg, BorderBrush = CalloutEdge, BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(8), Padding = new Thickness(13, 11),
+        Child = new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock { Text = "LIKELY CHECK", Foreground = AmberBr, FontSize = 10, FontWeight = FontWeight.Bold },
+                new TextBlock { Text = text, Foreground = TextBr, TextWrapping = TextWrapping.Wrap, FontSize = 12.5 },
+            },
+        },
+    };
+
+    // Each string literal as a green, monospace chip.
+    private Border Chip(string s) => new()
+    {
+        Background = ChipBg, BorderBrush = ChipEdge, BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6),
+        Child = new TextBlock
+        {
+            Text = "“" + s + "”", Foreground = GreenBr, FontFamily = Mono, FontSize = 12.5, TextWrapping = TextWrapping.Wrap,
+        },
+    };
+
+    // The decoded IL in an editor-style card, each instruction numbered in a gutter.
+    private Border IlBlock(IReadOnlyList<string> il)
+    {
+        int w = il.Count.ToString().Length;
+        var text = string.Join("\n", il.Select((ins, i) => (i + 1).ToString().PadLeft(w) + "   " + ins));
+        var box = new TextBox
+        {
+            Text = text, IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap,
+            Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            Foreground = TextBr, FontFamily = Mono, FontSize = 12.5, Padding = new Thickness(0),
+        };
+        return new Border
+        {
+            Background = CodeBg, BorderBrush = LineBr, BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 12), Child = box,
+        };
+    }
+
+    private static TextBlock SectionLabel(string s) => new()
+    {
+        Text = s, Foreground = DimBr, FontSize = 11, FontWeight = FontWeight.Bold,
+        LetterSpacing = 1.2, Margin = new Thickness(0, 6, 0, 0),
+    };
 
     // ---- Keygen: walk the reverse, let the user compute it, reveal on demand ----
     private async void OnOpenLevel2(object? sender, RoutedEventArgs e)
