@@ -23,19 +23,26 @@ public partial class MainWindow : Window
     private static readonly IBrush LineBr = new SolidColorBrush(Color.Parse("#262c34"));
     private static readonly IBrush TextBr = new SolidColorBrush(Color.Parse("#cdd3da"));
     private static readonly IBrush DimBr = new SolidColorBrush(Color.Parse("#7c8590"));
-    private static readonly IBrush AmberBr = new SolidColorBrush(Color.Parse("#e0a458"));
-    private static readonly IBrush GreenBr = new SolidColorBrush(Color.Parse("#6cc07a"));
+    // A calm, desaturated steel accent, not a neon amber: the de-vibe keeps the dark toolkit look
+    // without the warm glow. Matches App.axaml's Accent.
+    private static readonly IBrush AccentBr = new SolidColorBrush(Color.Parse("#7e96b3"));
+    private static readonly IBrush GreenBr = new SolidColorBrush(Color.Parse("#86ab8d"));
     private static readonly IBrush RedBr = new SolidColorBrush(Color.Parse("#c76b6b"));
     private static readonly IBrush Panel2Br = new SolidColorBrush(Color.Parse("#10141a"));
     private static readonly IBrush CodeBg = new SolidColorBrush(Color.Parse("#0c0f14"));
-    private static readonly IBrush ChipBg = new SolidColorBrush(Color.Parse("#11201a"));
-    private static readonly IBrush ChipEdge = new SolidColorBrush(Color.Parse("#1e3a2e"));
-    private static readonly IBrush CalloutEdge = new SolidColorBrush(Color.Parse("#4a3a1c"));
+    private static readonly IBrush ChipBg = new SolidColorBrush(Color.Parse("#141f1b"));
+    private static readonly IBrush ChipEdge = new SolidColorBrush(Color.Parse("#26392f"));
+    private static readonly IBrush CalloutEdge = new SolidColorBrush(Color.Parse("#2e3a46"));
 
     // Keygen state: the Seed I recovered, the serial it produces, and how far the walkthrough is.
     private int? _seed;
     private long _serial;
     private int _step;
+
+    // Flip state: the last patch result (the found gate and the patched bytes) and the source file's
+    // base name, for the suggested save name.
+    private FlipResult? _flip;
+    private string _flipBaseName = "target";
 
     // The tree row for the first likely check method, so opening a target lands you on it.
     private TreeViewItem? _checkItem;
@@ -48,11 +55,14 @@ public partial class MainWindow : Window
         Select("peek");
 
         // Open a target straight away when one is passed on the command line ("BreakBox path\to.dll"),
-        // so the tool can be launched onto a file. Done after the window loads so the controls exist.
+        // so the tool can be launched onto a file. "--flip path" opens it in Flip instead of Peek. Done
+        // after the window loads so the controls exist.
         var path = args?.FirstOrDefault(a =>
             File.Exists(a) && (a.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
                             || a.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)));
-        if (path is not null) Loaded += (_, _) => LoadPath(path);
+        var intoFlip = args?.Contains("--flip") == true;
+        if (path is not null)
+            Loaded += (_, _) => { if (intoFlip) { Select("flip"); FlipPath(path); } else LoadPath(path); };
     }
 
     private async void LoadPath(string path)
@@ -71,8 +81,10 @@ public partial class MainWindow : Window
     {
         PeekPanel.IsVisible = tool == "peek";
         KeygenPanel.IsVisible = tool == "keygen";
+        FlipPanel.IsVisible = tool == "flip";
         SetActive(NavPeek, tool == "peek");
         SetActive(NavKeygen, tool == "keygen");
+        SetActive(NavFlip, tool == "flip");
     }
 
     private static void SetActive(Button b, bool active)
@@ -83,7 +95,7 @@ public partial class MainWindow : Window
 
     // ---- Peek: read only X-ray, never runs the file ----
     private static readonly FontFamily Mono = new("Cascadia Mono, Consolas, monospace");
-    private static readonly IBrush CheckBg = new SolidColorBrush(Color.Parse("#241d10"));
+    private static readonly IBrush CheckBg = new SolidColorBrush(Color.Parse("#1b222b"));
 
     private async void OnOpenDll(object? sender, RoutedEventArgs e)
     {
@@ -110,7 +122,7 @@ public partial class MainWindow : Window
             void Count(MapType t) { typeCount++; foreach (var n in t.Nested) Count(n); }
             foreach (var t in map.Types) Count(t);
 
-            PeekStats.Children.Add(StatPill(typeCount, typeCount == 1 ? "type" : "types", AmberBr));
+            PeekStats.Children.Add(StatPill(typeCount, typeCount == 1 ? "type" : "types", AccentBr));
             PeekStats.Children.Add(StatPill(map.MethodCount, "methods", TextBr));
             PeekStats.Children.Add(StatPill(map.StringCount, "strings", GreenBr));
 
@@ -166,7 +178,7 @@ public partial class MainWindow : Window
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         row.Children.Add(new TextBlock { Text = "ƒ", Foreground = DimBr, FontFamily = Mono, VerticalAlignment = VerticalAlignment.Center });
-        row.Children.Add(new TextBlock { Text = m.Name, Foreground = m.LikelyCheck ? AmberBr : TextBr, VerticalAlignment = VerticalAlignment.Center });
+        row.Children.Add(new TextBlock { Text = m.Name, Foreground = m.LikelyCheck ? AccentBr : TextBr, VerticalAlignment = VerticalAlignment.Center });
         if (m.LikelyCheck)
             row.Children.Add(new Border
             {
@@ -176,7 +188,7 @@ public partial class MainWindow : Window
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(6, 0, 6, 1),
                 VerticalAlignment = VerticalAlignment.Center,
-                Child = new TextBlock { Text = "check", Foreground = AmberBr, FontSize = 10, FontWeight = FontWeight.Bold },
+                Child = new TextBlock { Text = "check", Foreground = AccentBr, FontSize = 10, FontWeight = FontWeight.Bold },
             });
         var item = new TreeViewItem { Header = row, Tag = m };
         if (m.LikelyCheck) _checkItem ??= item;
@@ -194,7 +206,7 @@ public partial class MainWindow : Window
 
         PeekDetail.Children.Add(new TextBlock
         {
-            Text = m.Name, Foreground = m.LikelyCheck ? AmberBr : TextBr, FontSize = 18, FontWeight = FontWeight.Bold,
+            Text = m.Name, Foreground = m.LikelyCheck ? AccentBr : TextBr, FontSize = 18, FontWeight = FontWeight.Bold,
         });
         PeekDetail.Children.Add(new TextBlock
         {
@@ -244,7 +256,7 @@ public partial class MainWindow : Window
             Spacing = 4,
             Children =
             {
-                new TextBlock { Text = "LIKELY CHECK", Foreground = AmberBr, FontSize = 10, FontWeight = FontWeight.Bold },
+                new TextBlock { Text = "LIKELY CHECK", Foreground = AccentBr, FontSize = 10, FontWeight = FontWeight.Bold },
                 new TextBlock { Text = text, Foreground = TextBr, TextWrapping = TextWrapping.Wrap, FontSize = 12.5 },
             },
         },
@@ -353,7 +365,7 @@ public partial class MainWindow : Window
     private Control ComputeCard(int seed)
     {
         var panel = new StackPanel { Spacing = 10 };
-        panel.Children.Add(new TextBlock { Text = "4 / your turn", Foreground = AmberBr, FontSize = 11, FontWeight = FontWeight.Bold });
+        panel.Children.Add(new TextBlock { Text = "4 / your turn", Foreground = AccentBr, FontSize = 11, FontWeight = FontWeight.Bold });
         panel.Children.Add(Body($"Work out {seed} * 31 + 1337 and type the serial. Or reveal it if you would rather just see it."));
 
         var input = new TextBox { Watermark = "your serial", Width = 220, HorizontalAlignment = HorizontalAlignment.Left };
@@ -392,11 +404,106 @@ public partial class MainWindow : Window
         return b;
     }
 
+    // ---- Flip: patch the client-side gate so it always returns true ----
+    private async void FlipPath(string path)
+    {
+        try
+        {
+            FlipTarget.Text = Path.GetFileName(path);
+            _flipBaseName = Path.GetFileNameWithoutExtension(path);
+            _flip = FlipPatcher.Flip(await File.ReadAllBytesAsync(path));
+            ShowFlip();
+        }
+        catch (Exception ex)
+        {
+            _flip = null;
+            FlipDetail.Children.Clear();
+            FlipDetail.Children.Add(Card("could not read the file", ex.Message, RedBr));
+        }
+    }
+
+    private async void OnOpenFlipDll(object? sender, RoutedEventArgs e)
+    {
+        var file = await PickAssembly("Choose a .NET assembly to patch");
+        if (file is null) return;
+
+        FlipTarget.Text = file.Name;
+        _flipBaseName = Path.GetFileNameWithoutExtension(file.Name);
+        FlipDetail.Children.Clear();
+
+        try
+        {
+            _flip = FlipPatcher.Flip(await ReadBytes(file));
+            ShowFlip();
+        }
+        catch (Exception ex)
+        {
+            _flip = null;
+            FlipDetail.Children.Add(Card("could not read the file", ex.Message, RedBr));
+        }
+    }
+
+    private void ShowFlip()
+    {
+        FlipDetail.Children.Clear();
+        if (_flip is null)
+        {
+            FlipDetail.Children.Add(Card("no gate to flip",
+                "I could not find a client-side gate here. Flip targets a bool method named like a licence " +
+                "check (for example IsPremium) whose body just returns false, which is the Level 3 gate. Open " +
+                "a Pixler target (Level3.dll).", RedBr));
+            return;
+        }
+
+        var f = _flip;
+
+        var head = new StackPanel { Spacing = 6 };
+        head.Children.Add(new TextBlock { Text = "THE GATE", Foreground = AccentBr, FontSize = 11, FontWeight = FontWeight.Bold });
+        head.Children.Add(new TextBlock { Text = f.Method, Foreground = TextBr, FontFamily = Mono, FontSize = 16, FontWeight = FontWeight.Bold });
+        head.Children.Add(Body("This method decides whether the premium features are unlocked. In the shipped build it " +
+            "returns false. Flip rewrites its body to return true and saves a valid assembly."));
+        FlipDetail.Children.Add(Shell(head, AccentBr));
+
+        FlipDetail.Children.Add(SectionLabel("BEFORE  ·  returns false"));
+        FlipDetail.Children.Add(IlBlock(f.Before));
+        FlipDetail.Children.Add(SectionLabel("AFTER  ·  returns true"));
+        FlipDetail.Children.Add(IlBlock(f.After));
+
+        var save = new Button { Content = "Patch and save…", HorizontalAlignment = HorizontalAlignment.Left };
+        save.Classes.Add("primary");
+        save.Click += async (_, _) => await SavePatched();
+        FlipDetail.Children.Add(save);
+    }
+
+    private async Task SavePatched()
+    {
+        if (_flip is null) return;
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return;
+
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save the patched assembly",
+            SuggestedFileName = _flipBaseName + ".patched.dll",
+            DefaultExtension = "dll",
+            FileTypeChoices = new[] { new FilePickerFileType(".NET assembly") { Patterns = new[] { "*.dll" } } },
+        });
+        if (file is null) return;
+
+        await using (var stream = await file.OpenWriteAsync())
+            await stream.WriteAsync(_flip.Patched);
+
+        FlipDetail.Children.Insert(0, Card("patched and saved",
+            $"Saved {file.Name}. The gate now returns true, so the premium features unlock when you run it. " +
+            "Open it in Peek to confirm the method changed. The real fix is to never ship that check: keep it " +
+            "on the server, where the attacker cannot rewrite it.", GreenBr));
+    }
+
     // ---- little UI helpers ----
     private Border Card(string title, string body, IBrush? accent = null)
     {
         var panel = new StackPanel { Spacing = 6 };
-        panel.Children.Add(new TextBlock { Text = title, Foreground = accent ?? AmberBr, FontSize = 11, FontWeight = FontWeight.Bold });
+        panel.Children.Add(new TextBlock { Text = title, Foreground = accent ?? AccentBr, FontSize = 11, FontWeight = FontWeight.Bold });
         panel.Children.Add(Body(body));
         return Shell(panel, accent);
     }

@@ -11,8 +11,11 @@
         <SolidColorBrush x:Key="LineBright">#3a434f</SolidColorBrush>
         <SolidColorBrush x:Key="Text">#cdd3da</SolidColorBrush>
         <SolidColorBrush x:Key="Dim">#7c8590</SolidColorBrush>
-        <SolidColorBrush x:Key="Amber">#e0a458</SolidColorBrush>
-        <SolidColorBrush x:Key="Green">#6cc07a</SolidColorBrush>
+        <!-- A calm, desaturated steel accent instead of a neon amber: keeps the dark toolkit look,
+             drops the warm glow. Primary is the near-white action button, matching the level apps. -->
+        <SolidColorBrush x:Key="Accent">#7e96b3</SolidColorBrush>
+        <SolidColorBrush x:Key="Primary">#e6e8ea</SolidColorBrush>
+        <SolidColorBrush x:Key="Green">#86ab8d</SolidColorBrush>
     </Application.Resources>
 
     <Application.Styles>
@@ -38,22 +41,22 @@
             <Setter Property="Background" Value="#1a1f27" />
         </Style>
         <Style Selector="Button.nav.active /template/ ContentPresenter">
-            <Setter Property="Background" Value="#241d10" />
+            <Setter Property="Background" Value="#1a2029" />
         </Style>
         <Style Selector="Button.nav.active">
-            <Setter Property="Foreground" Value="{DynamicResource Amber}" />
+            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
         </Style>
         <Style Selector="Button.nav:disabled">
             <Setter Property="Foreground" Value="#4a515b" />
         </Style>
 
-        <!-- primary action button -->
+        <!-- primary action button: a restrained near-white fill, not a neon accent -->
         <Style Selector="Button.primary">
-            <Setter Property="Foreground" Value="#1a1205" />
-            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#15181d" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <Style Selector="Button.primary /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource Amber}" />
+            <Setter Property="Background" Value="{DynamicResource Primary}" />
         </Style>
 
         <!-- section header on a card -->
@@ -70,18 +73,18 @@
             <Setter Property="Margin" Value="0,1" />
         </Style>
 
-        <!-- selection in the amber family, not the Windows system accent (which can be red/blue) -->
+        <!-- selection in a cool neutral grey, not the Windows system accent (which can be red/blue) -->
         <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background" Value="#2a220f" />
+            <Setter Property="Background" Value="#1e242c" />
         </Style>
         <Style Selector="TreeViewItem:selected:focus /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background" Value="#3a2e14" />
+            <Setter Property="Background" Value="#27303a" />
         </Style>
         <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background" Value="#3a2e14" />
+            <Setter Property="Background" Value="#27303a" />
         </Style>
         <Style Selector="TreeViewItem:selected:focus:pointerover /template/ Border#PART_LayoutRoot">
-            <Setter Property="Background" Value="#43350f" />
+            <Setter Property="Background" Value="#2c3642" />
         </Style>
 
         <!-- draggable divider between the two panes -->

@@ -25,7 +25,7 @@ public sealed record AssemblyMapResult(string Module, IReadOnlyList<MapType> Typ
 // what a decompiler does, only structured for a tree.
 public static class AssemblyMap
 {
-    private static readonly string[] CheckWords = { "valid", "check", "licen", "key", "serial", "unlock" };
+    private static readonly string[] CheckWords = { "valid", "check", "licen", "key", "serial", "unlock", "premium" };
 
     public static AssemblyMapResult Read(byte[] assembly)
     {
