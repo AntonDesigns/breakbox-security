@@ -18,8 +18,9 @@
   <ItemGroup>
     <ProjectReference Include="..\BreakBox.Studio\BreakBox.Studio.csproj" />
     <PackageReference Include="BreakBox.Core" Version="0.1.0" />
-    <!-- 0.2.0: the WinForms level targets + runnable-.exe packaging. Bumped in lockstep with the
-         generator package (breakbox-api publishes it); 0.1.0 stays immutable in the feed. -->
-    <PackageReference Include="BreakBox.Generator" Version="0.2.0" />
+    <!-- 0.3.0: Level 3 (Pixler) + the minimal dark level targets. Bumped in lockstep with the
+         generator package (breakbox-api publishes it on merge); 0.1.0/0.2.0 stay immutable in the feed.
+         This pin only restores once breakbox-api has published 0.3.0, so merge the api PR first. -->
+    <PackageReference Include="BreakBox.Generator" Version="0.3.0" />
   </ItemGroup>
 </Project>

@@ -22,7 +22,7 @@ namespace BreakBox.Studio.Engines;
 public sealed class CecilAssemblyInspector : IAssemblyInspector
 {
     // If a method name contains one of these words, it is probably the check I want to attack first.
-    private static readonly string[] CheckWords = { "valid", "check", "licen", "key", "serial", "unlock" };
+    private static readonly string[] CheckWords = { "valid", "check", "licen", "key", "serial", "unlock", "premium" };
 
     // Inspect: walk every type and method and report the three things I look at first when cracking.
     // I read the bytes from memory and never execute them, so pointing Peek at any file is safe.
