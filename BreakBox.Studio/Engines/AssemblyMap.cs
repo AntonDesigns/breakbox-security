@@ -53,37 +53,11 @@ public static class AssemblyMap
         var methods = new List<MapMethod>();
         foreach (var method in type.Methods)
         {
-            // Property and event accessors are noise in the map; the real logic is the named methods.
-            // So are the compiler's generated lambda bodies (names like "<.ctor>b__5_0"), which the
-            // new hand-built UI produces a lot of; hiding them keeps the tree readable.
-            if (method.Name.StartsWith("get_") || method.Name.StartsWith("set_") ||
-                method.Name.StartsWith("add_") || method.Name.StartsWith("remove_") ||
-                method.Name.Contains('<'))
-                continue;
-
-            var il = new List<string>();
-            var strings = new List<string>();
-            var bodyLooksLikeCheck = false;
-
-            if (method.HasBody)
-            {
-                foreach (var ins in method.Body.Instructions)
-                {
-                    il.Add(ins.ToString());
-                    if (ins.OpCode == OpCodes.Ldstr && ins.Operand is string s)
-                    {
-                        strings.Add(s);
-                        var low = s.ToLowerInvariant();
-                        if (low.Contains("invalid") || low.Contains("wrong") || low.Contains("unlock"))
-                            bodyLooksLikeCheck = true;
-                    }
-                }
-            }
-
-            var nameLooksLikeCheck = CheckWords.Any(w => method.Name.ToLowerInvariant().Contains(w));
-            methods.Add(new MapMethod(method.Name, nameLooksLikeCheck || bodyLooksLikeCheck, il, strings));
+            if (IsNoise(method.Name)) continue;
+            var mapped = ReadMethod(method);
+            methods.Add(mapped);
             methodCount++;
-            stringCount += strings.Count;
+            stringCount += mapped.Strings.Count;
         }
 
         var nested = new List<MapType>();
@@ -96,5 +70,39 @@ public static class AssemblyMap
         // A type with nothing worth showing is dropped.
         if (methods.Count == 0 && nested.Count == 0) return null;
         return new MapType(type.Name, methods, nested);
+    }
+
+    // Property and event accessors are noise in the map; the real logic is the named methods. So are
+    // the compiler's generated lambda bodies (names like "<.ctor>b__5_0"), which the hand-built UI
+    // produces a lot of; hiding them keeps the tree readable.
+    private static bool IsNoise(string name) =>
+        name.StartsWith("get_") || name.StartsWith("set_") ||
+        name.StartsWith("add_") || name.StartsWith("remove_") ||
+        name.Contains('<');
+
+    // Decode one method far enough to read: its IL, its strings, and whether it looks like the check.
+    private static MapMethod ReadMethod(MethodDefinition method)
+    {
+        var il = new List<string>();
+        var strings = new List<string>();
+        var bodyLooksLikeCheck = false;
+
+        if (method.HasBody)
+        {
+            foreach (var ins in method.Body.Instructions)
+            {
+                il.Add(ins.ToString());
+                if (ins.OpCode == OpCodes.Ldstr && ins.Operand is string s)
+                {
+                    strings.Add(s);
+                    var low = s.ToLowerInvariant();
+                    if (low.Contains("invalid") || low.Contains("wrong") || low.Contains("unlock"))
+                        bodyLooksLikeCheck = true;
+                }
+            }
+        }
+
+        var nameLooksLikeCheck = CheckWords.Any(w => method.Name.Contains(w, StringComparison.OrdinalIgnoreCase));
+        return new MapMethod(method.Name, nameLooksLikeCheck || bodyLooksLikeCheck, il, strings);
     }
 }

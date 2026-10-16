@@ -22,10 +22,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: gitleaks (secret scan)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Run gitleaks via its CLI, the same as breakbox-api. It scans the full git history, needs only
+      # the default contents:read, and does not pin a third-party action by tag (which is what
+      # SonarCloud flags, S7637).
+      - name: Secret scan (gitleaks)
+        run: |
+          curl -sSL --proto "=https" --tlsv1.2 https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar -xzf - gitleaks
+          chmod +x gitleaks
+          ./gitleaks detect --source . --redact --no-banner
 
   build-test:
     if: ${{ vars.PACKAGES_READY == 'true' }}

@@ -34,9 +34,13 @@ public static class Level2Keygen
         using var module = ModuleDefinition.ReadModule(ms);
 
         foreach (var type in module.Types)
-        foreach (var field in type.Fields)
-            if (field.Name == "Seed" && field.HasConstant && field.Constant is int seed)
-                return new Reverse(seed, SerialFromSeed(seed));
+        {
+            foreach (var field in type.Fields)
+            {
+                if (field.Name == "Seed" && field.HasConstant && field.Constant is int seed)
+                    return new Reverse(seed, SerialFromSeed(seed));
+            }
+        }
 
         return null;
     }
