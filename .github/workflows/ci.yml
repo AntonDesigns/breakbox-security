@@ -74,3 +74,63 @@ jobs:
           languages: csharp
       - uses: github/codeql-action/autobuild@v3
       - uses: github/codeql-action/analyze@v3
+
+  # SonarCloud quality gate for the security repo (BreakBox Studio: the Peek/Keygen/Flip engines).
+  # Coverage, maintainability, reliability and security hotspots (ISO/IEC 25010). Uses the SonarScanner
+  # for .NET so it understands C# and reads real line coverage. This is a SEPARATE SonarCloud project
+  # from breakbox-api (each repo is its own project).
+  #
+  # Gated until configured, same pattern as breakbox-api. To turn it on, in the repo's Settings:
+  #   Variables: SONAR_ENABLED=true, SONAR_ORG=<sonarcloud org key>, SONAR_PROJECT_KEY=<this repo's key>,
+  #              PACKAGES_READY=true
+  #   Secrets:   SONAR_TOKEN=<a SonarCloud analysis token>, PACKAGES_TOKEN=<read:packages token>
+  # It also needs the GitHub Packages feed, because the Studio tests consume BreakBox.Core/Generator
+  # (published by breakbox-api). The Generator pin is 0.3.0, so breakbox-api must have published 0.3.0
+  # first (merge the api PR before this one), or the restore fails like the other gated jobs.
+  sonarqube:
+    # startsWith (not == 'true') so a stray trailing space in the value can't silently skip it. Also
+    # requires PACKAGES_READY, because it builds the solution that consumes the packages.
+    if: ${{ startsWith(vars.SONAR_ENABLED, 'true') && vars.PACKAGES_READY == 'true' }}
+    # Runs on Windows: Peek/Keygen are exercised against freshly generated WinForms targets, so those
+    # tests are Windows-only. On Linux they would skip and the engines would show as uncovered, failing
+    # the New Code coverage gate. "shell: bash" keeps the scanner script identical to breakbox-api's.
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # full history, so Sonar can tell new code from old
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'        # the scanner runs on the JVM
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          source-url: https://nuget.pkg.github.com/AntonDesigns/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}   # the Core/Generator feed
+      - name: Install the SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+      - name: Analyse (build + tests with coverage)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # Git Bash on Windows path-converts any argument starting with "/", so the scanner's
+          # /k: /o: /d: flags arrive mangled. Exclude every argument from that MSYS conversion.
+          MSYS2_ARG_CONV_EXCL: "*"
+          MSYS_NO_PATHCONV: "1"
+        run: |
+          dotnet sonarscanner begin \
+            /k:"${{ vars.SONAR_PROJECT_KEY }}" \
+            /o:"${{ vars.SONAR_ORG }}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" \
+            /d:sonar.exclusions="docs/**" \
+            /d:sonar.coverage.exclusions="**/Program.cs,**/App.axaml.cs,**/MainWindow.axaml.cs"
+          dotnet build BreakBox.Security.sln -c Release
+          dotnet test BreakBox.Security.sln -c Release --no-build \
+            --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
