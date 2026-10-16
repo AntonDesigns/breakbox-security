@@ -34,6 +34,10 @@ public partial class MainWindow : Window
     private static readonly IBrush ChipEdge = new SolidColorBrush(Color.Parse("#26392f"));
     private static readonly IBrush CalloutEdge = new SolidColorBrush(Color.Parse("#2e3a46"));
 
+    // File-picker glob patterns, as static fields so the filters are not rebuilt on every open/save.
+    private static readonly string[] DllPattern = { "*.dll" };
+    private static readonly string[] DllExePattern = { "*.dll", "*.exe" };
+
     // Keygen state: the Seed I recovered, the serial it produces, and how far the walkthrough is.
     private int? _seed;
     private long _serial;
@@ -62,10 +66,10 @@ public partial class MainWindow : Window
                             || a.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)));
         var intoFlip = args?.Contains("--flip") == true;
         if (path is not null)
-            Loaded += (_, _) => { if (intoFlip) { Select("flip"); FlipPath(path); } else LoadPath(path); };
+            Loaded += async (_, _) => { if (intoFlip) { Select("flip"); await FlipPath(path); } else await LoadPath(path); };
     }
 
-    private async void LoadPath(string path)
+    private async Task LoadPath(string path)
     {
         try { LoadAssembly(Path.GetFileName(path), await File.ReadAllBytesAsync(path)); }
         catch (Exception ex) { ShowLoadError(ex.Message); }
@@ -118,9 +122,7 @@ public partial class MainWindow : Window
         {
             var map = AssemblyMap.Read(bytes);
 
-            var typeCount = 0;
-            void Count(MapType t) { typeCount++; foreach (var n in t.Nested) Count(n); }
-            foreach (var t in map.Types) Count(t);
+            var typeCount = map.Types.Sum(CountTypes);
 
             PeekStats.Children.Add(StatPill(typeCount, typeCount == 1 ? "type" : "types", AccentBr));
             PeekStats.Children.Add(StatPill(map.MethodCount, "methods", TextBr));
@@ -233,8 +235,12 @@ public partial class MainWindow : Window
             PeekDetail.Children.Add(IlBlock(m.Il));
     }
 
+    // Count every type in the map, nested ones included. A real method (not a captured local) so the
+    // analyzer can follow the count and the "1 type / N types" label is never seen as dead code.
+    private static int CountTypes(MapType t) => 1 + t.Nested.Sum(CountTypes);
+
     // A rounded count pill for the stats bar: the number in an accent colour, the label dimmed.
-    private Control StatPill(int count, string label, IBrush accent)
+    private static Border StatPill(int count, string label, IBrush accent)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
         row.Children.Add(new TextBlock { Text = count.ToString(), Foreground = accent, FontWeight = FontWeight.Bold, FontFamily = Mono });
@@ -247,7 +253,7 @@ public partial class MainWindow : Window
     }
 
     // The amber callout above a check method, so the important method stands out in the detail pane.
-    private Border Callout(string text) => new()
+    private static Border Callout(string text) => new()
     {
         Background = CheckBg, BorderBrush = CalloutEdge, BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(8), Padding = new Thickness(13, 11),
@@ -263,7 +269,7 @@ public partial class MainWindow : Window
     };
 
     // Each string literal as a green, monospace chip.
-    private Border Chip(string s) => new()
+    private static Border Chip(string s) => new()
     {
         Background = ChipBg, BorderBrush = ChipEdge, BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 6),
@@ -274,7 +280,7 @@ public partial class MainWindow : Window
     };
 
     // The decoded IL in an editor-style card, each instruction numbered in a gutter.
-    private Border IlBlock(IReadOnlyList<string> il)
+    private static Border IlBlock(IReadOnlyList<string> il)
     {
         int w = il.Count.ToString().Length;
         var text = string.Join("\n", il.Select((ins, i) => (i + 1).ToString().PadLeft(w) + "   " + ins));
@@ -359,10 +365,15 @@ public partial class MainWindow : Window
                 "program is not a secret.", GreenBr));
 
         if (_step < 3)
-            KgSteps.Children.Add(NextButton(_step == 0 ? "Next: recover the seed" : _step == 1 ? "Next: the rule" : "Next: your turn"));
+        {
+            string next = "Next: your turn";
+            if (_step == 0) next = "Next: recover the seed";
+            else if (_step == 1) next = "Next: the rule";
+            KgSteps.Children.Add(NextButton(next));
+        }
     }
 
-    private Control ComputeCard(int seed)
+    private Border ComputeCard(int seed)
     {
         var panel = new StackPanel { Spacing = 10 };
         panel.Children.Add(new TextBlock { Text = "4 / your turn", Foreground = AccentBr, FontSize = 11, FontWeight = FontWeight.Bold });
@@ -405,7 +416,7 @@ public partial class MainWindow : Window
     }
 
     // ---- Flip: patch the client-side gate so it always returns true ----
-    private async void FlipPath(string path)
+    private async Task FlipPath(string path)
     {
         try
         {
@@ -486,7 +497,7 @@ public partial class MainWindow : Window
             Title = "Save the patched assembly",
             SuggestedFileName = _flipBaseName + ".patched.dll",
             DefaultExtension = "dll",
-            FileTypeChoices = new[] { new FilePickerFileType(".NET assembly") { Patterns = new[] { "*.dll" } } },
+            FileTypeChoices = new[] { new FilePickerFileType(".NET assembly") { Patterns = DllPattern } },
         });
         if (file is null) return;
 
@@ -508,7 +519,7 @@ public partial class MainWindow : Window
         return Shell(panel, accent);
     }
 
-    private Border Shell(Control content, IBrush? accent) => new()
+    private static Border Shell(Control content, IBrush? accent) => new()
     {
         Background = PanelBr,
         BorderBrush = accent ?? LineBr,
@@ -530,7 +541,7 @@ public partial class MainWindow : Window
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = new[] { new FilePickerFileType(".NET assembly") { Patterns = new[] { "*.dll", "*.exe" } } }
+            FileTypeFilter = new[] { new FilePickerFileType(".NET assembly") { Patterns = DllExePattern } }
         });
         return files.Count > 0 ? files[0] : null;
     }

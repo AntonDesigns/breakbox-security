@@ -64,7 +64,7 @@ public static class FlipPatcher
     private static bool IsGate(MethodDefinition m)
     {
         if (!m.HasBody || m.ReturnType.MetadataType != MetadataType.Boolean) return false;
-        if (!GateWords.Any(w => m.Name.ToLowerInvariant().Contains(w))) return false;
+        if (!GateWords.Any(w => m.Name.Contains(w, StringComparison.OrdinalIgnoreCase))) return false;
         return ReturnsFalse(m);
     }
 
