@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Coverage settings for the SonarCloud quality gate. The CI runs "dotnet test" with XPlat Code
+     Coverage and this file, writing coverage in OpenCover format, which the SonarScanner for .NET
+     reads (sonar.cs.opencover.reportsPaths). MAH6 = 0x4D414836.
+     The Avalonia entry point (Program.cs) and the UI code-behind (App.axaml.cs, MainWindow.axaml.cs)
+     are composition and view wiring, not unit-tested; the engines (Peek, Keygen, Flip) are the logic
+     that carries the coverage. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>opencover</Format>
+          <ExcludeByFile>**/Program.cs,**/App.axaml.cs,**/MainWindow.axaml.cs</ExcludeByFile>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
